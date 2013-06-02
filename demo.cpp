@@ -4,21 +4,25 @@
 #include <cassert>
 #include <algorithm>
 #include <numeric>
-#include "sbrk_malloc.hpp"
+#include <cstdlib>
+#include "first_fit_malloc.hpp"
 
 
 int main()
 {
-  size_t n = 1 << 10;
+  for(int i = 0; i < 100; ++i)
+  {
+    size_t n = std::rand() % (1 << 10);
 
-  // malloc something
-  int *ptr = static_cast<int*>(sbrk_malloc(n * sizeof(int)));
+    // malloc something
+    int *ptr = static_cast<int*>(first_fit_malloc(n * sizeof(int)));
 
-  std::iota(ptr, ptr + n, 0);
+    std::iota(ptr, ptr + n, 0);
 
-  assert(std::is_sorted(ptr, ptr + n));
+    assert(std::is_sorted(ptr, ptr + n));
 
-  sbrk_free(ptr);
+    first_fit_free(ptr);
+  }
 
   return 0;
 }

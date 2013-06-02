@@ -1,3 +1,5 @@
+#pragma once
+
 void *sbrk_malloc(std::size_t size)
 {
   void *result = 0;
