@@ -235,6 +235,49 @@ void *first_fit_malloc(size_t size)
 } // end first_fit_malloc()
 
 
+// this is how free ought to look
+//void first_fit_free(void *ptr)
+//{
+//  if(ptr != 0)
+//  {
+//    block *b = get_block(ptr);
+//
+//    // free the block
+//    b->is_free = true;
+//
+//    // try to fuse the freed block with the previous block
+//    if(b->prev != 0 && b->prev->is_free)
+//    {
+//      b = b->prev;
+//      fuse_block(b);
+//    } // end if
+//
+//    // now try to fuse with the next block
+//    if(next(b) != heap_end)
+//    {
+//      fuse_block(b);
+//    } // end if
+//    else
+//    {
+//      // we just freed the last block in the heap
+//      if(b->prev == 0)
+//      {
+//        // the heap is empty
+//        heap_begin = 0;
+//        heap_end = 0;
+//      } // end if
+//      else
+//      {
+//        heap_end = b;
+//      } // end else
+//
+//      // let the OS know where the new break is
+//      brk(b);
+//    } // end else
+//  } // end if
+//} // end free()
+
+
 void first_fit_free(void *ptr)
 {
   if(ptr != 0)
