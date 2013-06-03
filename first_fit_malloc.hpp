@@ -16,6 +16,10 @@ struct block
 };
 
 
+block *heap_begin = 0;
+block *heap_end   = 0;
+
+
 void *data(block *b)
 {
   return reinterpret_cast<char*>(b) + sizeof(block);
@@ -30,10 +34,6 @@ block *prev(block *b)
 
 block *next(block *b)
 {
-//  return b->next;
-
-  block *heap_end = reinterpret_cast<block*>(sbrk(0));
-
   block *result = reinterpret_cast<block*>(reinterpret_cast<char*>(data(b)) + b->size);
 
   if(result == heap_end)
@@ -97,13 +97,9 @@ block *get_block(void *data)
 }
 
 
-// the base of the heap
-block *base = 0;
-
-
 block *find_first_free(block **last, size_t size)
 {
-  block *b = base;
+  block *b = heap_begin;
 
   while(b && !(b->is_free && b->size >= size))
   {
@@ -117,17 +113,26 @@ block *find_first_free(block **last, size_t size)
 
 block *extend_heap(block *prev, size_t size)
 {
-  block *new_block;
+  if(heap_begin == 0)
+  {
+    // initialize the extents of the heap to the current break
+    heap_begin = reinterpret_cast<block*>(sbrk(0));
+    heap_end = heap_begin;
+  }
 
   // get the position of the current break
-  new_block = reinterpret_cast<block*>(sbrk(0));
+  block *new_block = heap_end;
 
   // move the break to the right to accomodate both a block and the requested allocation
   if(sbrk(sizeof(block) + size) == reinterpret_cast<void*>(-1))
   {
     // allocation failed
+    // XXX should return heap_end here instead of 0
     return 0;
   }
+
+  // record the new end of the heap
+  heap_end = reinterpret_cast<block*>(reinterpret_cast<char*>(heap_end) + sizeof(block) + size);
 
   new_block->size = size;
   new_block->prev = prev;
@@ -192,10 +197,10 @@ void *first_fit_malloc(size_t size)
 
   size_t aligned_size = align4(size);
 
-  if(base)
+  if(heap_begin)
   {
     // find a block
-    last = base;
+    last = heap_begin;
 
     b = find_first_free(&last, aligned_size);
 
@@ -222,13 +227,11 @@ void *first_fit_malloc(size_t size)
   else
   {
     // first call
-    base = extend_heap(0, aligned_size);
-    if(!base)
+    b = extend_heap(0, aligned_size);
+    if(!b)
     {
       return 0;
     } // end if
-
-    b = base;
   } // end else
 
   return data(b);
@@ -303,15 +306,16 @@ void first_fit_free(void *ptr)
     } // end if
     else
     {
-      // we're at the end of the heap
-      if(b->prev)
+      // we just freed the last block in the heap
+      if(b->prev == 0)
       {
-        //b->prev->next = 0;
+        // the heap is empty
+        heap_begin = 0;
+        heap_end = 0;
       } // end if
       else
       {
-        // we freed the last block
-        base = 0;
+        heap_end = b;
       } // end else
 
       // the the OS know where the new break is
