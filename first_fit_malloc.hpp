@@ -3,10 +3,6 @@
 // inspired by http://www.inf.udec.cl/~leo/Malloc_tutorial.pdf
 
 
-// TODO introduce heap_begin & heap_end
-// TODO eliminate sbrk(0) calls
-
-
 struct block
 {
   size_t  size;
@@ -15,6 +11,7 @@ struct block
 };
 
 
+// XXX we shouldn't rely on this initialization
 block *heap_begin = 0;
 block *heap_end   = 0;
 
@@ -86,15 +83,14 @@ block *get_block(void *data)
 }
 
 
-block *find_first_free_insertion_point(size_t size)
+block *find_first_free_insertion_point(block *first, block *last, size_t size)
 {
-  block *prev = heap_end;
-  block *b = heap_begin;
+  block *prev = last;
 
-  while(b != heap_end && !(b->is_free && b->size >= size))
+  while(first != last && !(first->is_free && first->size >= size))
   {
-    prev = b;
-    b = next(b);
+    prev = first;
+    first = next(first);
   }
 
   return prev;
@@ -103,14 +99,7 @@ block *find_first_free_insertion_point(size_t size)
 
 block *extend_heap(block *prev, size_t size)
 {
-  if(heap_begin == 0)
-  {
-    // initialize the extents of the heap to the current break
-    heap_begin = reinterpret_cast<block*>(sbrk(0));
-    heap_end = heap_begin;
-  }
-
-  // get the position of the current break
+  // the new block goes at the current end of the heap
   block *new_block = heap_end;
 
   // move the break to the right to accomodate both a block and the requested allocation
@@ -137,16 +126,19 @@ size_t align4(size_t size)
 }
 
 
-// XXX this is how malloc ought to look
-//     we record the extent of the heap in [heap_begin,heap_end)
-//     find_first_free needs to return the node immediately previous
-//     to the first free block so that we know how to extend the heap
-//     in the case that there's no free block
 void *first_fit_malloc(size_t size)
 {
+  // XXX this should be done prior to calling malloc
+  if(heap_begin == 0)
+  {
+    // initialize the extents of the heap to the current break
+    heap_begin = reinterpret_cast<block*>(sbrk(0));
+    heap_end = heap_begin;
+  }
+
   size_t aligned_size = align4(size);
 
-  block *prev = find_first_free_insertion_point(aligned_size);
+  block *prev = find_first_free_insertion_point(heap_begin, heap_end, aligned_size);
 
   block *b;
 
@@ -174,49 +166,6 @@ void *first_fit_malloc(size_t size)
 } // end first_fit_malloc()
 
 
-// this is how free ought to look
-//void first_fit_free(void *ptr)
-//{
-//  if(ptr != 0)
-//  {
-//    block *b = get_block(ptr);
-//
-//    // free the block
-//    b->is_free = true;
-//
-//    // try to fuse the freed block with the previous block
-//    if(b->prev != 0 && b->prev->is_free)
-//    {
-//      b = b->prev;
-//      fuse_block(b);
-//    } // end if
-//
-//    // now try to fuse with the next block
-//    if(next(b) != heap_end)
-//    {
-//      fuse_block(b);
-//    } // end if
-//    else
-//    {
-//      // we just freed the last block in the heap
-//      if(b->prev == 0)
-//      {
-//        // the heap is empty
-//        heap_begin = 0;
-//        heap_end = 0;
-//      } // end if
-//      else
-//      {
-//        heap_end = b;
-//      } // end else
-//
-//      // let the OS know where the new break is
-//      brk(b);
-//    } // end else
-//  } // end if
-//} // end free()
-
-
 void first_fit_free(void *ptr)
 {
   if(ptr != 0)
@@ -242,17 +191,7 @@ void first_fit_free(void *ptr)
     } // end if
     else
     {
-      // we just freed the last block in the heap
-      if(b->prev == 0)
-      {
-        // the heap is empty
-        heap_begin = 0;
-        heap_end = 0;
-      } // end if
-      else
-      {
-        heap_end = b;
-      } // end else
+      heap_end = b;
 
       // the the OS know where the new break is
       brk(b);
