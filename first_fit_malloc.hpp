@@ -48,14 +48,12 @@ void split_block(block *b, size_t size)
   new_block->size = b->size - size - sizeof(block);
 
   new_block->prev = b;
-  //new_block->next = b->next;
   new_block->is_free = true;
 
   // the old block's size is the size of the split
   b->size = size;
 
   // link the old block to the new one
-  //b->next = new_block;
   if(next(new_block) != heap_end)
   {
     next(new_block)->prev = new_block;
@@ -68,7 +66,6 @@ bool fuse_block(block *b)
   if(next(b) != heap_end && next(b)->is_free)
   {
     b->size += sizeof(block) + next(b)->size;
-    //b->next = b->next->next;
 
     if(next(b) != heap_end)
     {
@@ -89,17 +86,18 @@ block *get_block(void *data)
 }
 
 
-block *find_first_free(block **last, size_t size)
+block *find_first_free_insertion_point(size_t size)
 {
+  block *prev = heap_end;
   block *b = heap_begin;
 
   while(b != heap_end && !(b->is_free && b->size >= size))
   {
-    *last = b;
+    prev = b;
     b = next(b);
   }
 
-  return b;
+  return prev;
 }
 
 
@@ -119,8 +117,7 @@ block *extend_heap(block *prev, size_t size)
   if(sbrk(sizeof(block) + size) == reinterpret_cast<void*>(-1))
   {
     // allocation failed
-    // XXX should return heap_end here instead of 0
-    return 0;
+    return new_block;
   }
 
   // record the new end of the heap
@@ -128,7 +125,6 @@ block *extend_heap(block *prev, size_t size)
 
   new_block->size = size;
   new_block->prev = prev;
-  //new_block->next = 0;
   new_block->is_free = false;
 
   return new_block;
@@ -146,76 +142,29 @@ size_t align4(size_t size)
 //     find_first_free needs to return the node immediately previous
 //     to the first free block so that we know how to extend the heap
 //     in the case that there's no free block
-//void *first_fit_malloc(size_t size)
-//{
-//  size_t aligned_size = align4(size);
-//
-//  block *prev = find_first_free(aligned_size);
-//
-//  block *b = next(prev);
-//
-//  if(b != heap_end)
-//  {
-//    // can we split?
-//    if((b->size - aligned_size) >= sizeof(block) + 4) // +4 for alignment
-//    {
-//      split_block(b, aligned_size);
-//    } // end if
-//
-//    b->is_free = false;
-//  } // end if
-//  else
-//  {
-//    // nothing fits, extend the heap
-//    b = extend_heap(prev, aligned_size);
-//    if(b == heap_end)
-//    {
-//      return 0;
-//    } // end if
-//  } // end else
-//
-//  return data(b);
-//} // end first_fit_malloc()
-
-
 void *first_fit_malloc(size_t size)
 {
-  block *b, *last;
-
   size_t aligned_size = align4(size);
 
-  if(heap_begin)
+  block *prev = find_first_free_insertion_point(aligned_size);
+
+  block *b;
+
+  if(prev != heap_end && (b = next(prev)) != heap_end)
   {
-    // find a block
-    last = heap_begin;
-
-    b = find_first_free(&last, aligned_size);
-
-    if(b)
+    // can we split?
+    if((b->size - aligned_size) >= sizeof(block) + 4) // +4 for alignment
     {
-      // can we split?
-      if((b->size - aligned_size) >= sizeof(block) + 4) // +4 for alignment
-      {
-        split_block(b, aligned_size);
-      } // end if
-
-      b->is_free = false;
+      split_block(b, aligned_size);
     } // end if
-    else
-    {
-      // nothing fits, extend the heap
-      b = extend_heap(last, aligned_size);
-      if(!b)
-      {
-        return 0;
-      } // end if
-    } // end else
+
+    b->is_free = false;
   } // end if
   else
   {
-    // first call
-    b = extend_heap(0, aligned_size);
-    if(!b)
+    // nothing fits, extend the heap
+    b = extend_heap(prev, aligned_size);
+    if(b == heap_end)
     {
       return 0;
     } // end if
