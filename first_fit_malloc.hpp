@@ -3,6 +3,11 @@
 // inspired by http://www.inf.udec.cl/~leo/Malloc_tutorial.pdf
 
 
+// TODO eliminate block::next
+// TODO introduce heap_begin & heap_end
+// TODO eliminate sbrk(0) calls
+
+
 struct block
 {
   size_t  size;
@@ -15,6 +20,18 @@ struct block
 void *data(block *b)
 {
   return reinterpret_cast<char*>(b) + sizeof(block);
+}
+
+
+block *prev(block *b)
+{
+  return b->prev;
+}
+
+
+block *next(block *b)
+{
+  return b->next;
 }
 
 
@@ -120,6 +137,43 @@ size_t align4(size_t size)
 {
   return ((((size - 1) >> 2) << 2) + 4);
 }
+
+
+// XXX this is how malloc ought to look
+//     we record the extent of the heap in [heap_begin,heap_end)
+//     find_first_free needs to return the node immediately previous
+//     to the first free block so that we know how to extend the heap
+//     in the case that there's no free block
+//void *first_fit_malloc(size_t size)
+//{
+//  size_t aligned_size = align4(size);
+//
+//  block *prev = find_first_free(aligned_size);
+//
+//  block *b = next(prev);
+//
+//  if(b != heap_end)
+//  {
+//    // can we split?
+//    if((b->size - aligned_size) >= sizeof(block) + 4) // +4 for alignment
+//    {
+//      split_block(b, aligned_size);
+//    } // end if
+//
+//    b->is_free = false;
+//  } // end if
+//  else
+//  {
+//    // nothing fits, extend the heap
+//    b = extend_heap(prev, aligned_size);
+//    if(b == heap_end)
+//    {
+//      return 0;
+//    } // end if
+//  } // end else
+//
+//  return data(b);
+//} // end first_fit_malloc()
 
 
 void *first_fit_malloc(size_t size)
