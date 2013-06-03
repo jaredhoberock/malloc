@@ -7,6 +7,8 @@ struct block
 {
   size_t  size;
   block  *prev;
+
+  // XXX we could use the MSB of size to encode is_free
   int     is_free;
 };
 
