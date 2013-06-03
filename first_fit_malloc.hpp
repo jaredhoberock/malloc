@@ -11,7 +11,6 @@ struct block
 {
   size_t  size;
   block  *prev;
-  //block  *next; // XXX isn't this just data(block) + size?
   int     is_free;
 };
 
@@ -34,14 +33,7 @@ block *prev(block *b)
 
 block *next(block *b)
 {
-  block *result = reinterpret_cast<block*>(reinterpret_cast<char*>(data(b)) + b->size);
-
-  if(result == heap_end)
-  {
-    result = 0;
-  }
-
-  return result;
+  return reinterpret_cast<block*>(reinterpret_cast<char*>(data(b)) + b->size);
 }
 
 
@@ -64,7 +56,7 @@ void split_block(block *b, size_t size)
 
   // link the old block to the new one
   //b->next = new_block;
-  if(next(new_block))
+  if(next(new_block) != heap_end)
   {
     next(new_block)->prev = new_block;
   } // end if
@@ -73,12 +65,12 @@ void split_block(block *b, size_t size)
 
 bool fuse_block(block *b)
 {
-  if(next(b) && next(b)->is_free)
+  if(next(b) != heap_end && next(b)->is_free)
   {
     b->size += sizeof(block) + next(b)->size;
     //b->next = b->next->next;
 
-    if(next(b))
+    if(next(b) != heap_end)
     {
       next(b)->prev = b;
     }
@@ -101,7 +93,7 @@ block *find_first_free(block **last, size_t size)
 {
   block *b = heap_begin;
 
-  while(b && !(b->is_free && b->size >= size))
+  while(b != heap_end && !(b->is_free && b->size >= size))
   {
     *last = b;
     b = next(b);
@@ -138,11 +130,6 @@ block *extend_heap(block *prev, size_t size)
   new_block->prev = prev;
   //new_block->next = 0;
   new_block->is_free = false;
-
-  if(prev)
-  {
-    //prev->next = new_block;
-  }
 
   return new_block;
 }
@@ -300,7 +287,7 @@ void first_fit_free(void *ptr)
     } // end if
 
     // now try to fuse with the next block
-    if(next(b))
+    if(next(b) != heap_end)
     {
       fuse_block(b);
     } // end if
