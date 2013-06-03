@@ -3,7 +3,6 @@
 // inspired by http://www.inf.udec.cl/~leo/Malloc_tutorial.pdf
 
 
-// TODO eliminate block::next
 // TODO introduce heap_begin & heap_end
 // TODO eliminate sbrk(0) calls
 
@@ -12,7 +11,7 @@ struct block
 {
   size_t  size;
   block  *prev;
-  block  *next; // XXX isn't this just data(block) + size?
+  //block  *next; // XXX isn't this just data(block) + size?
   int     is_free;
 };
 
@@ -31,7 +30,18 @@ block *prev(block *b)
 
 block *next(block *b)
 {
-  return b->next;
+//  return b->next;
+
+  block *heap_end = reinterpret_cast<block*>(sbrk(0));
+
+  block *result = reinterpret_cast<block*>(reinterpret_cast<char*>(data(b)) + b->size);
+
+  if(result == heap_end)
+  {
+    result = 0;
+  }
+
+  return result;
 }
 
 
@@ -46,31 +56,31 @@ void split_block(block *b, size_t size)
   new_block->size = b->size - size - sizeof(block);
 
   new_block->prev = b;
-  new_block->next = b->next;
+  //new_block->next = b->next;
   new_block->is_free = true;
 
   // the old block's size is the size of the split
   b->size = size;
 
   // link the old block to the new one
-  b->next = new_block;
-  if(new_block->next)
+  //b->next = new_block;
+  if(next(new_block))
   {
-    new_block->next->prev = new_block;
+    next(new_block)->prev = new_block;
   } // end if
 } // end split_block()
 
 
 bool fuse_block(block *b)
 {
-  if(b->next && b->next->is_free)
+  if(next(b) && next(b)->is_free)
   {
-    b->size += sizeof(block) + b->next->size;
-    b->next = b->next->next;
+    b->size += sizeof(block) + next(b)->size;
+    //b->next = b->next->next;
 
-    if(b->next)
+    if(next(b))
     {
-      b->next->prev = b;
+      next(b)->prev = b;
     }
 
     return true;
@@ -98,7 +108,7 @@ block *find_first_free(block **last, size_t size)
   while(b && !(b->is_free && b->size >= size))
   {
     *last = b;
-    b = b->next;
+    b = next(b);
   }
 
   return b;
@@ -121,12 +131,12 @@ block *extend_heap(block *prev, size_t size)
 
   new_block->size = size;
   new_block->prev = prev;
-  new_block->next = 0;
+  //new_block->next = 0;
   new_block->is_free = false;
 
   if(prev)
   {
-    prev->next = new_block;
+    //prev->next = new_block;
   }
 
   return new_block;
@@ -244,7 +254,7 @@ void first_fit_free(void *ptr)
     } // end if
 
     // now try to fuse with the next block
-    if(b->next)
+    if(next(b))
     {
       fuse_block(b);
     } // end if
@@ -253,7 +263,7 @@ void first_fit_free(void *ptr)
       // we're at the end of the heap
       if(b->prev)
       {
-        b->prev->next = 0;
+        //b->prev->next = 0;
       } // end if
       else
       {
