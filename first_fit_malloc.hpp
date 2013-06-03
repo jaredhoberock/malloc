@@ -178,8 +178,6 @@ void first_fit_free(void *ptr)
     b->is_free = true;
 
     // try to fuse the freed block the previous block
-    // XXX we could instead attempt to fuse with the next block if it is free
-    //     this way maybe we could do without the prev pointer
     if(b->prev && b->prev->is_free)
     {
       b = b->prev;
